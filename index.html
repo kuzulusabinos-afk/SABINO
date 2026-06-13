@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tomate Sort · Câmera</title>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+:root{
+  --bg:#0c1410; --bg2:#121d17; --card:#16241c; --bdr:#243329; --bdr2:#33473a;
+  --tx:#e8f3ec; --tx2:#9db5a8; --tx3:#5e7568;
+  --verm:#ff5d5d; --verde:#3ddc84; --amar:#ffc83d; --azul:#5da9ff;
+  --r-sm:8px; --r-md:14px; --r-lg:20px;
+  --f:'Rajdhani',sans-serif; --m:'Share Tech Mono',monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--f);font-size:15px;height:100%}
+.wrap{max-width:480px;margin:0 auto;padding:1.25rem 1rem 3rem;min-height:100%}
+
+h1{font-size:19px;margin:0 0 .2rem}
+.sub{font-size:12px;color:var(--tx3);font-family:var(--m);margin-bottom:1rem}
+
+/* ── CONNECT SCREEN ── */
+#connect-screen{display:flex;flex-direction:column;gap:1rem}
+.input-box label{font-size:12px;color:var(--tx2);font-family:var(--m);display:block;margin-bottom:6px}
+input[type=text]{width:100%;padding:12px 14px;border-radius:var(--r-sm);border:1px solid var(--bdr2);background:var(--bg2);color:var(--tx);font-family:var(--m);font-size:14px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:12px 18px;border-radius:var(--r-sm);font-size:14px;font-weight:700;font-family:var(--f);cursor:pointer;border:1px solid var(--bdr2);transition:all .15s;background:var(--bg2);color:var(--tx);width:100%}
+.btn:active{transform:scale(.98)}
+.btn-primary{background:linear-gradient(135deg,var(--verm),var(--verde));border:none;color:#06140d}
+.status-text{font-size:13px;font-family:var(--m);color:var(--azul);text-align:center;padding:10px;border-radius:var(--r-sm);background:var(--bg2);border:1px solid var(--bdr2)}
+
+/* ── MAIN APP ── */
+#main-app{display:none;flex-direction:column;gap:1rem}
+#main-app.visible{display:flex}
+
+.cam-wrap{position:relative;border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--bdr2);background:#000;aspect-ratio:3/4}
+#video{width:100%;height:100%;object-fit:cover;display:block}
+#canvas{display:none}
+
+.cam-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.cam-flash{position:absolute;inset:0;background:#fff;opacity:0;transition:opacity .15s}
+.cam-flash.on{opacity:.85}
+
+.result-badge{position:absolute;top:14px;left:14px;right:14px;padding:10px 16px;border-radius:14px;font-family:var(--m);font-weight:700;font-size:14px;text-align:center;backdrop-filter:blur(6px);transition:all .3s;opacity:0;transform:translateY(-10px)}
+.result-badge.show{opacity:1;transform:translateY(0)}
+.rb-verm{background:rgba(255,93,93,.25);border:1px solid var(--verm);color:#fff}
+.rb-verde{background:rgba(61,220,132,.25);border:1px solid var(--verde);color:#fff}
+.rb-amar{background:rgba(255,200,61,.25);border:1px solid var(--amar);color:#fff}
+
+.net-id{font-family:var(--m);font-size:12px;color:var(--azul);word-break:break-all;padding:8px 12px;background:rgba(93,169,255,.08);border-radius:var(--r-sm);border:1px solid rgba(93,169,255,.2);margin-bottom:.5rem;text-align:center}
+
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.card{background:var(--card);border:1px solid var(--bdr);border-radius:var(--r-md);padding:.8rem;text-align:center}
+.card.k-verm{border-color:rgba(255,93,93,.3)}
+.card.k-verde{border-color:rgba(61,220,132,.3)}
+.card.k-amar{border-color:rgba(255,200,61,.3)}
+.k-label{font-size:10px;font-family:var(--m);color:var(--tx3);text-transform:uppercase;margin-bottom:4px}
+.k-val{font-size:24px;font-weight:700;font-family:var(--m)}
+.k-verm .k-val{color:var(--verm)}
+.k-verde .k-val{color:var(--verde)}
+.k-amar .k-val{color:var(--amar)}
+
+.status-line{display:flex;align-items:center;gap:8px;justify-content:center;font-size:12px;font-family:var(--m);color:var(--tx2)}
+.dot{width:8px;height:8px;border-radius:50%}
+.blink{animation:blink 1.4s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+
+.calib{background:var(--card);border:1px solid var(--bdr);border-radius:var(--r-md);padding:1rem;font-size:12px;color:var(--tx2);font-family:var(--m);line-height:1.6}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🍅 Tomate Sort</h1>
+  <div class="sub">App da câmera — classificação de cor</div>
+
+  <!-- CONNECT SCREEN -->
+  <div id="connect-screen">
+    <div class="input-box">
+      <label>ID do Servidor (PC)</label>
+      <input type="text" id="peer-id" placeholder="tomate-sort-2026">
+    </div>
+    <button class="btn btn-primary" id="btn-ligar" onclick="ligar()">🔗 Ligar ao servidor</button>
+    <div class="status-text" id="status-text">Insere o ID do PC e liga.</div>
+    <div id="cam-error" class="status-text hd" style="color:var(--verm);border-color:var(--verm);text-align:left;line-height:1.6"></div>
+    <button class="btn hd" id="btn-retry" onclick="ligar()">🔄 Tentar novamente</button>
+  </div>
+
+  <!-- MAIN APP -->
+  <div id="main-app">
+    <div class="net-id" id="net-status">Ligado ao servidor</div>
+
+    <div class="cam-wrap">
+      <video id="video" autoplay playsinline muted></video>
+      <div class="cam-flash" id="flash"></div>
+      <div id="result-badge" class="result-badge"></div>
+    </div>
+    <canvas id="canvas"></canvas>
+
+    <div class="status-line">
+      <div class="dot blink" id="wait-dot" style="background:var(--azul)"></div>
+      <span id="wait-text">À espera de comando do servidor...</span>
+    </div>
+
+    <div class="g3">
+      <div class="card k-verm">
+        <div class="k-label">🔴 Vermelho</div>
+        <div class="k-val" id="count-vermelho">0</div>
+      </div>
+      <div class="card k-verde">
+        <div class="k-label">🟢 Verde</div>
+        <div class="k-val" id="count-verde">0</div>
+      </div>
+      <div class="card k-amar">
+        <div class="k-label">🟡 Não Tomate</div>
+        <div class="k-val" id="count-naotomate">0</div>
+      </div>
+    </div>
+
+    <button class="btn" onclick="testCapture()">📷 Testar captura manual</button>
+    <button class="btn" onclick="disconnect()">⏹ Desligar</button>
+
+    <div class="calib">
+      <strong>ℹ Como funciona:</strong><br>
+      Quando o servidor pede uma captura, esta app analisa a cor média da zona central da imagem da câmera.
+      Tons predominantemente vermelhos = tomate maduro. Tons predominantemente verdes = tomate imaturo.
+      Qualquer outra cor (amarelo, objeto, fundo, etc.) = "não é tomate".
+    </div>
+  </div>
+</div>
+
+<script>
+let peer = null;
+let conn = null;
+let connected = false;
+let stream = null;
+
+const TARGET_ID_DEFAULT = 'tomate-sort-2026';
+
+let counts = { VERMELHO: 0, VERDE: 0, NAO_TOMATE: 0 };
+
+/* ══════════════════════════════════════════════
+   LIGAÇÃO PEERJS
+   ══════════════════════════════════════════════ */
+function ligar() {
+  const idInput = document.getElementById('peer-id').value.trim() || TARGET_ID_DEFAULT;
+  document.getElementById('btn-ligar').disabled = true;
+  document.getElementById('btn-retry').classList.add('hd');
+  document.getElementById('cam-error').classList.add('hd');
+
+  // Verifica se o contexto é seguro (HTTPS ou localhost) — getUserMedia exige isto
+  if (!window.isSecureContext) {
+    showCamError(
+      '⚠ Ligação não segura.<br><br>' +
+      'O acesso à câmera só funciona em <strong>HTTPS</strong> (ou localhost).<br>' +
+      'Esta página está a abrir em <strong>' + location.protocol + '//' + location.host + '</strong>.<br><br>' +
+      'Coloca este ficheiro num servidor com HTTPS (ex: GitHub Pages, Netlify, Vercel) e abre o link por aí.'
+    );
+    return;
+  }
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showCamError('⚠ Este navegador não suporta acesso à câmera (getUserMedia). Usa o Chrome no Android.');
+    return;
+  }
+
+  setStatus('🔄 A iniciar câmera...');
+  startCamera().then(() => {
+    setStatus('🔄 A ligar ao servidor...');
+    _tentarLigar(idInput);
+  }).catch(e => {
+    handleCameraError(e);
+  });
+}
+
+function handleCameraError(e) {
+  let msg = '';
+  if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+    msg = '🚫 Permissão da câmera negada.<br><br>' +
+          'Para corrigir:<br>' +
+          '1. Toca no ícone de cadeado/informação ao lado do endereço.<br>' +
+          '2. Em "Câmera", escolhe <strong>Permitir</strong>.<br>' +
+          '3. Recarrega a página e tenta novamente.';
+  } else if (e.name === 'NotFoundError' || e.name === 'DevicesNotFoundError') {
+    msg = '⚠ Nenhuma câmera encontrada neste dispositivo.';
+  } else if (e.name === 'NotReadableError' || e.name === 'TrackStartError') {
+    msg = '⚠ A câmera está a ser usada por outra aplicação. Fecha outras apps que usem a câmera e tenta novamente.';
+  } else if (e.name === 'OverconstrainedError') {
+    msg = '⚠ A câmera não suporta a configuração pedida. (' + (e.constraint || '') + ')';
+  } else {
+    msg = '⚠ Erro ao aceder à câmera: ' + (e.message || e.name || e);
+  }
+  showCamError(msg);
+}
+
+function showCamError(html) {
+  const el = document.getElementById('cam-error');
+  el.innerHTML = html;
+  el.classList.remove('hd');
+  document.getElementById('btn-retry').classList.remove('hd');
+  document.getElementById('btn-ligar').disabled = false;
+  setStatus('Falhou. Corrige o problema e tenta novamente.');
+}
+
+let _retryTimer = null, _connTimeout = null;
+
+function _tentarLigar(targetId) {
+  if (_connTimeout) { clearTimeout(_connTimeout); _connTimeout = null; }
+  if (conn) { try { conn.close(); } catch(e){} conn = null; }
+  if (peer) { try { peer.destroy(); } catch(e){} peer = null; }
+
+  peer = new Peer('tomate-mobile-' + Math.random().toString(36).substr(2, 6), {
+    host: '0.peerjs.com', port: 443, path: '/', secure: true, debug: 0,
+    config: { iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:global.stun.twilio.com:3478' }
+    ]}
+  });
+
+  peer.on('open', () => {
+    setStatus('🌐 A contactar servidor...');
+    conn = peer.connect(targetId, { reliable: true });
+
+    _connTimeout = setTimeout(() => {
+      if (conn && conn.open) return;
+      setStatus('⏱ Sem resposta · A tentar novamente...');
+      _tentarLigar(targetId);
+    }, 6000);
+
+    conn.on('open', () => {
+      clearTimeout(_connTimeout);
+      connected = true;
+      setStatus('✅ Ligado!');
+      conn.send({ type: 'PING' });
+      document.getElementById('connect-screen').classList.add('hd');
+      document.getElementById('main-app').classList.add('visible');
+    });
+
+    conn.on('data', handleServerMsg);
+
+    conn.on('close', () => {
+      connected = false;
+      document.getElementById('connect-screen').classList.remove('hd');
+      document.getElementById('main-app').classList.remove('visible');
+      setStatus('⚡ Ligação perdida · A reconectar...');
+      _tentarLigar(targetId);
+    });
+
+    conn.on('error', () => { clearTimeout(_connTimeout); _tentarLigar(targetId); });
+  });
+
+  peer.on('error', err => {
+    clearTimeout(_connTimeout);
+    setStatus(`⚠ ${err.type} · Nova tentativa em 3s...`);
+    _retryTimer = setTimeout(() => _tentarLigar(targetId), 3000);
+  });
+}
+
+function disconnect() {
+  if (_retryTimer) { clearTimeout(_retryTimer); _retryTimer = null; }
+  if (_connTimeout) { clearTimeout(_connTimeout); _connTimeout = null; }
+  if (conn) { try { conn.close(); } catch(e){} conn = null; }
+  if (peer) { try { peer.destroy(); } catch(e){} peer = null; }
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  connected = false;
+  document.getElementById('connect-screen').classList.remove('hd');
+  document.getElementById('main-app').classList.remove('visible');
+  document.getElementById('btn-ligar').disabled = false;
+  setStatus('Desligado.');
+}
+
+function setStatus(t) { document.getElementById('status-text').textContent = t; }
+
+/* ══════════════════════════════════════════════
+   CÂMERA
+   ══════════════════════════════════════════════ */
+async function startCamera() {
+  stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
+    audio: false
+  });
+  const video = document.getElementById('video');
+  video.srcObject = stream;
+  return new Promise(resolve => { video.onloadedmetadata = () => resolve(); });
+}
+
+/* ══════════════════════════════════════════════
+   MENSAGENS DO SERVIDOR
+   - { type:'CAPTURAR' }            -> tira foto e classifica
+   - { type:'STATE', counts:{...} } -> sincroniza contadores
+   - { type:'PONG' }
+   ══════════════════════════════════════════════ */
+function handleServerMsg(data) {
+  if (data.type === 'PONG') return;
+  if (data.type === 'STATE') {
+    if (data.counts) { counts = data.counts; updateCounts(); }
+    return;
+  }
+  if (data.type === 'CAPTURAR') {
+    capturarEClassificar();
+    return;
+  }
+}
+
+function testCapture() { capturarEClassificar(); }
+
+/* ══════════════════════════════════════════════
+   CAPTURA + CLASSIFICAÇÃO DE COR
+   Analisa pixels da zona central da imagem.
+   ══════════════════════════════════════════════ */
+function capturarEClassificar() {
+  document.getElementById('wait-text').textContent = '📷 A capturar...';
+  document.getElementById('wait-dot').style.background = 'var(--amar)';
+  flash();
+
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  canvas.width = video.videoWidth || 640;
+  canvas.height = video.videoHeight || 480;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  // Zona central (50% da área)
+  const cw = canvas.width, ch = canvas.height;
+  const zw = Math.floor(cw * 0.5), zh = Math.floor(ch * 0.5);
+  const zx = Math.floor((cw - zw) / 2), zy = Math.floor((ch - zh) / 2);
+  const imgData = ctx.getImageData(zx, zy, zw, zh).data;
+
+  let rSum = 0, gSum = 0, bSum = 0, n = 0;
+  for (let i = 0; i < imgData.length; i += 4) {
+    rSum += imgData[i];
+    gSum += imgData[i+1];
+    bSum += imgData[i+2];
+    n++;
+  }
+  const rAvg = rSum / n, gAvg = gSum / n, bAvg = bSum / n;
+
+  const cor = classificarCor(rAvg, gAvg, bAvg);
+
+  setTimeout(() => {
+    counts[cor]++;
+    updateCounts();
+    showResultBadge(cor, rAvg, gAvg, bAvg);
+    document.getElementById('wait-text').textContent = 'À espera de comando do servidor...';
+    document.getElementById('wait-dot').style.background = 'var(--azul)';
+
+    if (conn && conn.open) conn.send({ type: 'RESULTADO', cor: cor });
+  }, 300);
+}
+
+/* ── Lógica de classificação por cor média RGB ──
+   - VERMELHO: canal R muito superior a G e B (tomate maduro)
+   - VERDE   : canal G superior a R e B (tomate imaturo)
+   - NAO_TOMATE: qualquer outra combinação (amarelo, objeto, fundo, etc.)
+*/
+function classificarCor(r, g, b) {
+  const brightness = (r + g + b) / 3;
+  // Cena muito escura / sem objeto perceptível
+  if (brightness < 25) return 'NAO_TOMATE';
+
+  if (r > g + 25 && r > b + 25 && r > 90) {
+    return 'VERMELHO';
+  }
+  if (g > r + 15 && g > b + 10 && g > 60) {
+    return 'VERDE';
+  }
+  return 'NAO_TOMATE';
+}
+
+function showResultBadge(cor, r, g, b) {
+  const badge = document.getElementById('result-badge');
+  const map = {
+    VERMELHO: { cls: 'rb-verm', txt: `🔴 TOMATE VERMELHO  (R:${r.toFixed(0)} G:${g.toFixed(0)} B:${b.toFixed(0)})` },
+    VERDE:    { cls: 'rb-verde', txt: `🟢 TOMATE VERDE  (R:${r.toFixed(0)} G:${g.toFixed(0)} B:${b.toFixed(0)})` },
+    NAO_TOMATE: { cls: 'rb-amar', txt: `🟡 NÃO É TOMATE  (R:${r.toFixed(0)} G:${g.toFixed(0)} B:${b.toFixed(0)})` }
+  };
+  const info = map[cor];
+  badge.className = 'result-badge show ' + info.cls;
+  badge.textContent = info.txt;
+  setTimeout(() => badge.classList.remove('show'), 2200);
+}
+
+function flash() {
+  const f = document.getElementById('flash');
+  f.classList.add('on');
+  setTimeout(() => f.classList.remove('on'), 120);
+}
+
+function updateCounts() {
+  document.getElementById('count-vermelho').textContent = counts.VERMELHO || 0;
+  document.getElementById('count-verde').textContent = counts.VERDE || 0;
+  document.getElementById('count-naotomate').textContent = counts.NAO_TOMATE || 0;
+}
+</script>
+</body>
+</html>
